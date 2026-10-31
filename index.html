@@ -46,6 +46,20 @@ tbody tr:hover{background:#1b2a40}
 <div class="check" style="margin:10px 0;border-color:#3b5877"><div class="label">CURRENT PAPER TRADE STATUS</div><div id="oaTradeStatus" class="big amber">CLOSED · No open trade</div><div id="oaTradeDetails" class="sub">Open a paper trade or enable Auto Paper Mode to start.</div></div><div id="oaNote" class="sub" style="margin-top:10px">Auto mode is OFF until enabled. Adjustment rule: one short leg must decay by at least 20% (current ask ≤ 80% of its entry premium) AND the opposite running leg's premium must rise by at least 7% above its entry premium (current ask ≥ 107% of entry). If the opposite leg's premium falls by 7% or more, this condition is NOT satisfied and no adjustment/liquidation happens because of this rule. When both conditions are met, book paper P&L on the decayed leg and select the replacement using the full original rules against current live BTC options spot: rebuild the PE/CE candidate pair within 5–9% OTM on each side, target ~7% OTM, and match their live sell-bid premiums as closely as possible; then reopen only the decayed side at its selected strike. The opposite running leg remains open. Overall TP/SL also remains active. No real orders are sent.</div>
 <div class="check" style="margin-top:14px"><div class="top"><div><div class="label">LIVE OPTION CHAIN</div><h2 style="margin:6px 0">All strikes · PE/CE bid-ask · Premium gap</h2><div class="sub">Selected expiry ke har available strike ka live quote. Best-bid/ask unavailable ho to blank dikhaya jayega—mark price ko quote bana kar nahi dikhayenge.</div></div><div id="oaChainMeta" class="status">Waiting for chain…</div></div><div class="chain-legend"><span><i class="legend-dot"></i> Nearest strike to live BTC spot</span><span><i class="legend-sel"></i> Strategy-selected PE/CE strike</span></div><div class="tablewrap" style="max-height:460px"><table><thead><tr><th>Strike</th><th>Spot distance</th><th>PE Bid</th><th>PE Ask</th><th>CE Bid</th><th>CE Ask</th><th>PE/CE Bid Gap</th><th>Premium Gap %</th><th>Strategy</th></tr></thead><tbody id="oaChainRows"><tr><td colspan="9">Waiting for live option chain…</td></tr></tbody></table></div></div>
 </section>
+
+<section class="check" id="oaPerformanceDashboard" style="margin-top:18px;border:1px solid #38516f;background:linear-gradient(145deg,#101c2d,#0b1422);padding:18px">
+ <div class="top" style="align-items:flex-start;gap:12px;flex-wrap:wrap"><div><div class="label" style="letter-spacing:1.8px;color:#83b9ff">PAPER TRADING ANALYTICS</div><h2 style="margin:7px 0 4px">Order History &amp; P&amp;L Dashboard</h2><div class="sub">Live unrealised MTM, realised results and paper-order ledger · updates with option quotes</div></div><div id="oaDashFeed" class="status">Waiting for market data</div></div>
+ <div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-top:14px">
+  <div class="check"><div class="label">UNREALISED NET P&amp;L</div><div id="oaDashUnrealised" class="big">—</div><div class="sub">Open legs · estimated fees</div></div>
+  <div class="check"><div class="label">REALISED NET P&amp;L</div><div id="oaDashRealised" class="big">0.00</div><div class="sub">Closed paper trades</div></div>
+  <div class="check"><div class="label">TOTAL NET P&amp;L</div><div id="oaDashTotal" class="big">—</div><div class="sub">Realised + unrealised</div></div>
+  <div class="check"><div class="label">OPEN POSITIONS</div><div id="oaDashOpen" class="big">0</div><div class="sub">Active paper legs</div></div>
+  <div class="check"><div class="label">EST. EXIT FEES</div><div id="oaDashFees" class="big">—</div><div class="sub">Entry + buyback estimate</div></div>
+ </div>
+ <div class="top" style="margin:18px 0 9px;flex-wrap:wrap"><div><div class="label">TRADE LEDGER</div><h3 style="margin:5px 0">Orders &amp; Live MTM</h3></div><div class="sub">Premium-unit estimates · contract multiplier not applied</div></div>
+ <div class="tablewrap"><table style="min-width:1000px"><thead><tr><th>Time</th><th>Event</th><th>Leg</th><th>Option Symbol</th><th>Entry</th><th>Exit / Live Ask</th><th>Qty</th><th>Gross P&amp;L</th><th>Fees</th><th>Net P&amp;L</th></tr></thead><tbody id="oaJournal"><tr><td colspan="10">Waiting for paper orders…</td></tr></tbody></table></div>
+ <div class="sub" style="margin-top:10px">Important: this is a paper-trading estimate, not an exchange order ledger. Live MTM uses the best ask to estimate buying back short options (mark fallback when available). Contract multiplier and actual exchange fee treatment are not applied; actual realised results depend on recorded paper exits and available market data.</div>
+</section>
 </main>
 
 
@@ -80,6 +94,13 @@ function oaRenderJournal(){
   return {symbol:leg.opt.symbol,exit:NaN,gross:0,fees:0,net:0,source:'WAIT'};
  });
  const mtmNet=mtmGross-mtmFees,allPriced=active.length>0&&priced===active.length;
+ const dashSet=(id,value,cls)=>{const el=oa$(id);if(el){el.textContent=value;el.className='big '+(cls||'')}};
+ dashSet('oaDashUnrealised',active.length?(allPriced?oaCash(mtmNet):'Waiting quotes'):'0.00',allPriced?(mtmNet>0?'green':mtmNet<0?'red':''):'');
+ dashSet('oaDashRealised',oaCash(oaRealised),oaRealised>0?'green':oaRealised<0?'red':'');
+ dashSet('oaDashTotal',active.length?(allPriced?oaCash(oaRealised+mtmNet):'Waiting quotes'):oaCash(oaRealised),(oaRealised+mtmNet)>0?'green':(oaRealised+mtmNet)<0?'red':'');
+ dashSet('oaDashOpen',String(active.length),active.length?'green':'');
+ dashSet('oaDashFees',active.length?(allPriced?oaFmt(mtmFees):'Waiting'):'0.00','');
+ if(oa$('oaDashFeed'))oa$('oaDashFeed').textContent=allPriced?'LIVE MTM · '+new Date().toLocaleTimeString():(active.length?'OPEN · WAITING FOR QUOTES':'PAPER MODE · NO OPEN TRADE');
  const setCard=(id,value,cls)=>{const el=oa$(id);if(el){el.textContent=value;el.className='big '+(cls||'')}};
  setCard('oaMtmGross',active.length?(allPriced?oaCash(mtmGross):'Waiting quotes'):'—',allPriced?(mtmGross>0?'green':mtmGross<0?'red':''):'');
  setCard('oaMtmFees',active.length?(allPriced?oaFmt(mtmFees):'—'):'—');
