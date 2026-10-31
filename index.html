@@ -24,19 +24,9 @@ tbody tr:hover{background:#1b2a40}
 .legend-sel{width:9px;height:9px;border-radius:3px;display:inline-block;background:#2ce0a6}
 @media(max-width:760px){.wrap{padding:10px}.card{padding:12px}td,th{padding:9px 10px}table{font-size:12px}}
 
-/* Trading-terminal workspace */
-.workspace-tabs{display:flex;gap:7px;flex-wrap:wrap;padding:8px;background:#0a1320;border:1px solid var(--line);border-radius:12px;margin:0 0 12px}
-.workspace-tab{background:transparent;border-color:transparent;color:#9eafc7;padding:10px 15px;border-radius:8px}
-.workspace-tab.active{background:#24364f;border-color:#405a7a;color:#fff;box-shadow:inset 0 -2px 0 #4de1ff}
-.workspace-pane{display:none;min-width:0;animation:fadeIn .16s ease}.workspace-pane.active{display:block}
-.window-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
-.window-title h2{font-size:16px;margin:0}.window-caption{color:var(--muted);font-size:11px}
-#oaMtmCards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-@keyframes fadeIn{from{opacity:.65;transform:translateY(2px)}to{opacity:1;transform:none}}
-@media(max-width:600px){.workspace-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.workspace-tab{padding:9px 4px;font-size:12px}#oaMtmCards{grid-template-columns:1fr 1fr!important}}
 </style></head><body><main class="wrap">
 
-<header class="top"><div><div class="brand">◈ BTC FLOWDESK <span style="color:var(--blue)">PRO</span></div><div class="muted">BTC options terminal · Portfolio · Positions · Orders · Paper trading</div></div><div id="status" class="status">Connecting to Delta Exchange India…</div></header>
+<header class="top"><div><div class="brand">◈ BTC FLOWDESK <span style="color:var(--blue)">PRO</span></div><div class="muted">Live order flow · Order history · Mark-to-market · Paper trading</div></div><div id="status" class="status">Connecting to Delta Exchange India…</div></header>
 <section id="optionAutoDesk" class="card" style="margin-bottom:10px;border-color:#6b5aa6">
 <div class="top"><div><div class="label">Automated paper strategy</div><h2 style="margin:6px 0">BTC SHORT STRANGLE · ALL EXPIRIES</h2><div class="sub">Sell PE near Spot −7% and CE near Spot +7%. Paper orders only.</div></div><div id="oaStatus" class="status">Loading all expiries…</div></div>
 <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
@@ -65,30 +55,7 @@ tbody tr:hover{background:#1b2a40}
 <div class="sub" style="margin-top:10px">MTM uses live best ask to estimate buying back short legs (mark fallback shown where available); values are provisional premium-unit estimates and do not apply a verified contract multiplier.\nRisk note: a short strangle can incur very large losses. This is a browser-based paper simulator, not a live order system. Keep this page open for automated monitoring. Premium P&amp;L is provisional until Delta contract multiplier and fee rules are verified; API/network interruptions can delay exits. Open paper trade, realised P&L, auto-mode setting, and trade history are saved in this browser. Refreshing Chrome should restore them; clearing site data/browser storage can still erase them. Live P&L updates after the option feed reconnects.</div>
 </section>
 </main>
-<script>
-(function(){
- const root=document.getElementById('optionAutoDesk');if(!root)return;
- const header=root.querySelector(':scope > .top');
- const nav=document.createElement('nav');nav.className='workspace-tabs';nav.setAttribute('aria-label','Trading terminal windows');
- const panes=document.createElement('div');panes.id='workspacePanes';
- const defs=[['overview','Overview','Portfolio overview'],['positions','Positions','Live positions & MTM'],['orders','Orders','Paper order book & trade history'],['chain','Option Chain','All expiry strikes & quotes'],['strategy','Strategy','Strategy controls & risk settings']];
- const paneMap={};
- defs.forEach((d,i)=>{const b=document.createElement('button');b.type='button';b.className='workspace-tab'+(i===0?' active':'');b.textContent=d[1];b.dataset.pane=d[0];nav.appendChild(b);const p=document.createElement('div');p.className='workspace-pane'+(i===0?' active':'');p.id='pane-'+d[0];p.innerHTML='<div class="window-title"><h2>'+d[2]+'</h2><span class="window-caption">PAPER TRADING · NO REAL ORDERS</span></div>';panes.appendChild(p);paneMap[d[0]]=p;});
- if(header){header.insertAdjacentElement('afterend',nav);nav.insertAdjacentElement('afterend',panes)}else{root.prepend(nav);nav.after(panes)}
- const nodes=Array.from(root.children).filter(n=>n!==header&&n!==nav&&n!==panes);
- const has=(n,ids)=>ids.some(id=>n.querySelector&&n.querySelector('#'+id));
- nodes.forEach(n=>{
-  if(has(n,['oaChainRows']))paneMap.chain.appendChild(n);
-  else if(has(n,['oaMtmCards']))paneMap.positions.appendChild(n);
-  else if(has(n,['oaJournal']))paneMap.orders.appendChild(n);
-  else if(has(n,['oaTp','oaSl','oaFee','oaQty','oaAuto','oaManualEntry','oaManualExit','oaClearJournal','oaRefresh','oaTradeStatus','oaNote','oaRiskTargets']))paneMap.strategy.appendChild(n);
-  else if(has(n,['oaExpiry','oaSpot','oaStrikes','oaPePrem','oaCePrem','oaCredit','oaPePnl','oaCePnl','oaPnl','oaRealised']))paneMap.overview.appendChild(n);
-  else paneMap.strategy.appendChild(n);
- });
- nav.addEventListener('click',e=>{const b=e.target.closest('button[data-pane]');if(!b)return;nav.querySelectorAll('.workspace-tab').forEach(x=>x.classList.toggle('active',x===b));Object.entries(paneMap).forEach(([k,p])=>p.classList.toggle('active',k===b.dataset.pane));});
- const w=document.createElement('div');w.className='tablewrap';w.id='oaPositionsTable';w.style.marginTop='12px';w.innerHTML='<table><thead><tr><th>Product</th><th>Side</th><th>Qty</th><th>Avg. Entry</th><th>Live Buyback</th><th>Gross MTM</th><th>Est. Fees</th><th>Net MTM</th></tr></thead><tbody id="oaPositionsRows"><tr><td colspan="8">No open paper positions.</td></tr></tbody></table>';paneMap.positions.appendChild(w);
-})();
-</script>
+
 
 <script>
 (function(){
@@ -128,8 +95,6 @@ function oaRenderJournal(){
  setCard('oaMtmState',oaPosition?(allPriced?'LIVE · '+priced+'/'+active.length:'OPEN · '+priced+'/'+active.length):'NO OPEN TRADE',oaPosition?(allPriced?'green':'amber'):'');
  if(oa$('oaMtmUpdated'))oa$('oaMtmUpdated').textContent=allPriced?'Updated '+new Date().toLocaleTimeString():'Waiting for current option quote';
  if(oa$('oaMtmDebit'))oa$('oaMtmDebit').textContent='Estimated buyback debit '+(allPriced?oaFmt(mtmDebit):'—')+' · multiplier not applied';
- const posBody=oa$('oaPositionsRows');
- if(posBody){posBody.innerHTML=active.length?active.map((leg,i)=>{const q=liveRows[i],side=leg.side.includes('PE')?'SELL PE':'SELL CE',exit=Number.isFinite(q.exit)?oaFmt(q.exit)+(q.source==='MARK'?' · mark':''):'Waiting quote';return '<tr><td>'+leg.opt.symbol+'</td><td>'+side+'</td><td>'+oaFmt(oaPosition.qty)+'</td><td>'+oaFmt(leg.entry)+'</td><td>'+exit+'</td><td class="'+(q.gross>0?'green':q.gross<0?'red':'')+'">'+(Number.isFinite(q.exit)?oaCash(q.gross):'—')+'</td><td>'+(Number.isFinite(q.exit)?oaFmt(q.fees):'—')+'</td><td class="'+(q.net>0?'green':q.net<0?'red':'')+'">'+(Number.isFinite(q.exit)?oaCash(q.net):'—')+'</td></tr>';}).join(''):'<tr><td colspan="8">No open paper positions. Open a paper trade to see live MTM here.</td></tr>';}
  const liveBySymbol=new Map(liveRows.map(x=>[x.symbol,x]));
  const html=rows.map(r=>{
   const liveLeg=active.find(l=>l.opt.symbol===r.symbol),isOpen=!!liveLeg;
