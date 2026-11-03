@@ -64,16 +64,16 @@ tbody tr:hover{background:#1b2a40}
 <div class="top" style="flex-wrap:wrap"><div><div class="label" style="color:#70e3bd">PERMANENT CLOSED-TRADE ARCHIVE</div><h2 style="margin:7px 0">Closed Orders · Saved History</h2><div class="sub">All completed paper-trade legs are stored here with their realised P&amp;L.</div></div><div class="status" id="oaArchiveCount">0 archived rows</div></div>
 <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-top:12px"><div class="check"><div class="label">CLOSED ORDERS</div><div class="big" id="oaArchiveTrades">0</div></div><div class="check"><div class="label">ARCHIVED REALISED NET</div><div class="big" id="oaArchiveNet">0.00</div></div><div class="check"><div class="label">ARCHIVE STATUS</div><div class="big green" id="oaArchiveStatus">LOCAL SAVE</div><div class="sub">Saved in this browser</div></div></div>
 <div class="tablewrap" style="margin-top:12px"><table style="min-width:1000px"><thead><tr><th>Closed Time</th><th>Close Reason</th><th>Leg</th><th>Option Symbol</th><th>Entry</th><th>Exit</th><th>Qty</th><th>Gross P&amp;L</th><th>Fees</th><th>Net P&amp;L</th></tr></thead><tbody id="oaClosedRows"><tr><td colspan="10">No closed orders archived yet.</td></tr></tbody></table></div>
-<div style="display:flex;align-items:stretch;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:12px">
- <div style="display:flex;align-content:flex-start;align-items:flex-start;justify-content:flex-start;gap:8px;flex-wrap:wrap;max-width:100%">
+<div style="display:flex;justify-content:center;align-items:stretch;gap:10px;flex-wrap:wrap;margin:14px auto 12px;max-width:1080px">
+ <div class="check" style="flex:1 1 190px;max-width:310px;padding:12px 14px"><div class="label">CLOSED GROSS P&amp;L</div><div class="big" id="oaArchiveGross">0.00</div></div>
+ <div class="check" style="flex:1 1 190px;max-width:310px;padding:12px 14px"><div class="label">TOTAL FEES</div><div class="big" id="oaArchiveFees">0.00</div></div>
+ <div class="check" style="flex:1 1 190px;max-width:310px;padding:12px 14px"><div class="label">CLOSED NET P&amp;L</div><div class="big green" id="oaArchiveNetSummary">0.00</div></div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px">
+ <div style="display:flex;justify-content:flex-start;align-items:center;gap:8px;flex-wrap:wrap">
   <button id="oaExportExcel" class="btn" type="button">Export Excel</button><button id="oaExportPdf" class="btn" type="button">Export PDF</button>
  </div>
- <div style="display:flex;gap:8px;flex:1 1 480px;justify-content:flex-end;flex-wrap:wrap">
-  <div class="check" style="flex:1 1 125px;padding:10px 12px"><div class="label">CLOSED GROSS P&amp;L</div><div class="big" id="oaArchiveGross">0.00</div></div>
-  <div class="check" style="flex:1 1 110px;padding:10px 12px"><div class="label">TOTAL FEES</div><div class="big" id="oaArchiveFees">0.00</div></div>
-  <div class="check" style="flex:1 1 125px;padding:10px 12px"><div class="label">CLOSED NET P&amp;L</div><div class="big green" id="oaArchiveNetSummary">0.00</div></div>
-  <div style="flex:1 1 100%;display:flex;justify-content:flex-end"><button id="oaClearArchive" class="btn danger" type="button">Clear Closed Orders &amp; Saved History</button></div>
- </div>
+ <button id="oaClearArchive" class="btn danger" type="button">Clear Closed Orders &amp; Saved History</button>
 </div>
 <div class="sub" style="margin-top:10px">Note: this archive is protected from the dashboard clear button, but it is browser-local—not literally permanent. Clearing site data, browser storage, changing devices or storage limits can still remove it. Keep an external backup for important records.</div></section>
 </main>
