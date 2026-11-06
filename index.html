@@ -152,10 +152,15 @@ function oaFreshRiskCalc(){if(!oaPosition||!oaPosition.legs?.length)return null;
 let oaRiskClosing=false;
 function oaSelectLegStopReplacement(side,oldSymbol,targetPremium){
  const pair=oaPairs[oaPosition?.expiryKey||oa$('oaExpiry').value];if(!pair||!(oaSpot>0)||!(targetPremium>0))return null;
- const isPut=side==='SELL PE',list=isPut?pair.puts:pair.calls;
+ const isPut=side==='SELL PE',list=isPut?pair.puts:pair.calls,now=Date.now();
  const candidates=list.filter(o=>o.symbol!==oldSymbol&&Number.isFinite(oaStrike(o))&&(isPut?oaStrike(o)<oaSpot:oaStrike(o)>oaSpot)&&Math.abs((oaStrike(o)-oaSpot)/oaSpot)>=.05&&Math.abs((oaStrike(o)-oaSpot)/oaSpot)<=.09);
  let best=null;
- for(const o of candidates){const bid=oaBid(o);if(!(bid>0))continue;const premiumGap=Math.abs(bid-targetPremium)/targetPremium,dist=Math.abs(Math.abs((oaStrike(o)-oaSpot)/oaSpot*100)-7);if(!best||premiumGap<best.premiumGap-1e-9||(Math.abs(premiumGap-best.premiumGap)<1e-9&&dist<best.dist))best={opt:o,bid,premiumGap,dist}}
+ for(const item of candidates){
+  const o=oaTickers.find(x=>x.symbol===item.symbol)||item,q=o?.quotes||{},stamp=Math.max(Number(q.live_updated_at)||0,Number(q.quote_snapshot_at)||0),bid=oaNum(q.best_bid);
+  if(!(bid>0&&stamp>0&&now-stamp<=12000))continue;
+  const premiumGap=Math.abs(bid-targetPremium)/targetPremium,dist=Math.abs(Math.abs((oaStrike(o)-oaSpot)/oaSpot*100)-7);
+  if(!best||premiumGap<best.premiumGap-1e-9||(Math.abs(premiumGap-best.premiumGap)<1e-9&&dist<best.dist))best={opt:o,bid,premiumGap,dist};
+ }
  return best;
 }
 function oaCheckIndividualLegStopLoss(sl){
@@ -188,7 +193,38 @@ function oaCheckStopLoss(){if(!oaPosition||oaRiskClosing)return;const r=oaFreshR
 function oaCalc(){if(!oaPosition)return null;let gross=0,fees=0,exitDebit=0;for(const leg of oaPosition.legs){const mark=oaLegValue(leg);if(!Number.isFinite(mark)||mark<0)return null;gross+=(leg.entry-mark)*oaPosition.qty;fees+=(leg.entry+mark)*oaPosition.qty*oaFeeRate();exitDebit+=mark*oaPosition.qty}return {gross,fees,net:gross-fees,exitDebit}}
 function oaWriteAdjustmentRow(action,leg,exitPrice,gross,fees,net,credit){const row={time:new Date().toLocaleString(),expiry:oaPosition?.expiry||'',leg:leg.side.includes('PE')?'PE':'CE',action,symbol:leg.opt.symbol,entryPremium:leg.entry,exitPremium:Number.isFinite(exitPrice)?exitPrice:0,qty:oaPosition?.qty??oaQuantity(),gross:gross??0,fees:fees??0,net:net??0};oaJournal.unshift(row);if(String(action).includes('DECAY PROFIT BOOK')||String(action).includes('STOP LOSS EXIT'))oaArchiveClosedRows();oaRenderJournal();oaSaveState()}
 function oaSelectReplacement(side,oldSymbol){const pair=oaPairs[oaPosition?.expiryKey||oa$('oaExpiry').value];if(!pair||!(oaSpot>0))return null;/* Reapply the FULL original entry-selection rules at current live BTC options spot: both strikes 5–9% OTM, target ~7% OTM, and choose the PE/CE pair with the closest sell-bid premiums. */const isPut=side==='SELL PE';const puts=pair.puts.filter(o=>o.symbol!==oldSymbol&&Number.isFinite(oaStrike(o))&&oaStrike(o)<oaSpot&&((oaSpot-oaStrike(o))/oaSpot)>=.05&&((oaSpot-oaStrike(o))/oaSpot)<=.09);const calls=pair.calls.filter(o=>Number.isFinite(oaStrike(o))&&oaStrike(o)>oaSpot&&((oaStrike(o)-oaSpot)/oaSpot)>=.05&&((oaStrike(o)-oaSpot)/oaSpot)<=.09);if(!puts.length||!calls.length)return null;let best=null;for(const p of puts){for(const c of calls){const pp=oaBid(p),cp=oaBid(c);if(!(pp>0&&cp>0))continue;const gap=Math.abs(pp-cp),avg=(pp+cp)/2,score=gap/Math.max(avg,1e-9),targetDist=Math.abs((oaSpot-oaStrike(p))/oaSpot*100-7)+Math.abs((oaStrike(c)-oaSpot)/oaSpot*100-7);if(!best||score<best.score-1e-9||(Math.abs(score-best.score)<1e-9&&targetDist<best.targetDist))best={p,c,score,targetDist}}}if(!best)return null;const opt=isPut?best.p:best.c;return {opt,bid:oaBid(opt),score:best.score,targetDist:best.targetDist,pairedSymbol:(isPut?best.c:best.p).symbol,pairedBid:oaBid(isPut?best.c:best.p)}}
-function oaCheckDecayAdjustments(){if(!oaAutoOn||!oaPosition||oaPosition.adjusting)return;for(const leg of [...oaPosition.legs]){const ask=oaNum(leg.opt.quotes?.best_ask);if(!(leg.entry>0&&ask>0&&ask<=leg.entry*.8))continue;const otherLeg=oaPosition.legs.find(l=>l!==leg);if(!otherLeg)continue;const otherAsk=oaNum(otherLeg.opt.quotes?.best_ask);if(!(otherLeg.entry>0&&otherAsk>0&&otherAsk>=otherLeg.entry*1.07))continue;const replacement=oaSelectLegStopReplacement(leg.side,leg.opt.symbol,otherLeg.entry);if(!replacement)continue;oaPosition.adjusting=true;const qty=oaPosition.qty,entry=leg.entry,gross=(entry-ask)*qty,fees=(entry+ask)*qty*oaFeeRate(),net=gross-fees;oaRealised+=net;oaWriteAdjustmentRow('20% DECAY PROFIT BOOK',leg,ask,gross,fees,net,entry*qty);const idx=oaPosition.legs.findIndex(l=>l.side===leg.side);if(idx<0){oaPosition.adjusting=false;return}oaPosition.legs.splice(idx,1,{side:leg.side,opt:replacement.opt,entry:replacement.bid,entryAt:Date.now()});oaPosition.credit=Math.max(0,oaPosition.legs.reduce((sum,l)=>sum+l.entry,0)*qty);oaWriteAdjustmentRow('ADJUSTMENT RE-ENTRY',oaPosition.legs[idx],NaN,0,0,0,replacement.bid*qty);oa$('oaNote').textContent=leg.side+' premium decayed 20% and opposite leg moved at least 7% from its entry premium: profit booked on '+leg.opt.symbol+' and replacement short opened at '+replacement.opt.symbol+' using current BTC spot, 5–9% OTM / ~7% target rules, and the closest available sell bid to the opposite leg original entry premium '+oaFmt(otherLeg.entry)+'.';oaPosition.adjusting=false;break}}
+function oaCheckDecayAdjustments(){
+ if(!oaAutoOn||!oaPosition||oaPosition.adjusting||oaPosition.legs.length!==2)return;
+ const now=Date.now();
+ for(const leg of [...oaPosition.legs]){
+  const otherLeg=oaPosition.legs.find(l=>l!==leg);if(!otherLeg)continue;
+  const liveLeg=oaLiveOption(leg),liveOther=oaLiveOption(otherLeg),q=liveLeg?.quotes||{},oq=liveOther?.quotes||{};
+  const ask=oaNum(q.best_ask),otherAsk=oaNum(oq.best_ask);
+  const stamp=Math.max(Number(q.live_updated_at)||0,Number(q.quote_snapshot_at)||0),otherStamp=Math.max(Number(oq.live_updated_at)||0,Number(oq.quote_snapshot_at)||0);
+  if(!(ask>0&&otherAsk>0&&stamp>0&&otherStamp>0&&now-stamp<=12000&&now-otherStamp<=12000)){
+   if(oa$('oaRiskStatus'))oa$('oaRiskStatus').textContent='20% DECAY ADJUSTMENT · WAITING — both leg quotes must be fresh (≤12 seconds).';
+   continue;
+  }
+  if(!(leg.entry>0&&ask<=leg.entry*.8))continue;
+  if(!(otherLeg.entry>0&&otherAsk>=otherLeg.entry*1.07))continue;
+  const replacement=oaSelectLegStopReplacement(leg.side,leg.opt.symbol,otherLeg.entry);
+  if(!replacement){
+   if(oa$('oaRiskStatus'))oa$('oaRiskStatus').textContent='20% DECAY TRIGGER MET · WAITING — no fresh 5–9% OTM replacement sell bid sufficiently available to match opposite leg original entry premium '+oaFmt(otherLeg.entry)+'.';
+   if(oa$('oaNote'))oa$('oaNote').textContent='Decay conditions met for '+leg.side+', but no valid fresh replacement quote is available. Position remains unchanged; system will retry on fresh market updates.';
+   return;
+  }
+  oaPosition.adjusting=true;
+  const qty=oaPosition.qty,entry=leg.entry,gross=(entry-ask)*qty,fees=(entry+ask)*qty*oaFeeRate(),net=gross-fees;
+  oaRealised+=net;oaWriteAdjustmentRow('20% DECAY PROFIT BOOK',leg,ask,gross,fees,net,entry*qty);
+  const idx=oaPosition.legs.findIndex(l=>l.side===leg.side);if(idx<0){oaPosition.adjusting=false;return}
+  oaPosition.legs.splice(idx,1,{side:leg.side,opt:replacement.opt,entry:replacement.bid,entryAt:Date.now()});
+  oaPosition.credit=Math.max(0,oaPosition.legs.reduce((sum,l)=>sum+l.entry,0)*qty);
+  oaWriteAdjustmentRow('ADJUSTMENT RE-ENTRY',oaPosition.legs[idx],NaN,0,0,0,replacement.bid*qty);
+  oa$('oaNote').textContent=leg.side+' premium decayed 20% and opposite leg moved at least 7%: profit booked on '+leg.opt.symbol+' and replacement opened at '+replacement.opt.symbol+'. Selected current fresh sell bid '+oaFmt(replacement.bid)+' closest to opposite leg original entry premium '+oaFmt(otherLeg.entry)+' within 5–9% OTM (target ~7%).';
+  if(oa$('oaRiskStatus'))oa$('oaRiskStatus').textContent='20% DECAY ADJUSTMENT · COMPLETED — '+leg.side+' replaced; opposite leg remains open.';
+  oaPosition.adjusting=false;oaSaveState();break;
+ }
+}
 function oaWriteJournal(action,result){if(!oaPosition)return;const time=new Date().toLocaleString(),qty=oaPosition.qty;for(const leg of oaPosition.legs){let gross=0,fees=0,exitPremium=0;if(result){exitPremium=oaLegValue(leg);gross=(leg.entry-exitPremium)*qty;fees=(leg.entry+exitPremium)*qty*oaFeeRate()}oaJournal.unshift({time,expiry:oaPosition.expiry,leg:leg.side.includes('PE')?'PE':'CE',action,symbol:leg.opt.symbol,entryPremium:leg.entry,exitPremium,qty,gross,fees,net:gross-fees})}oaRenderJournal();oaSaveState()}
 function oaEnter(source){if(oaPosition)return false;const legs=oaSelectLegs();if(!legs){oa$('oaNote').textContent='No valid PE/CE pair for selected expiry. Check option-chain data.';return false}const pb=oaBid(legs.p),cb=oaBid(legs.c);if(!(pb>0&&cb>0)){oa$('oaNote').textContent='Bid premiums not available; entry skipped.';return false}const qty=oaQuantity();oaPosition={qty,expiry:legs.date.toLocaleDateString(),expiryKey:oa$('oaExpiry').value,openedAt:Date.now(),legs:[{side:'SELL PE',opt:legs.p,entry:pb,entryAt:Date.now()},{side:'SELL CE',opt:legs.c,entry:cb,entryAt:Date.now()}],credit:(pb+cb)*qty};oaWriteJournal(source+' ENTRY',null);oa$('oaNote').textContent='Paper short strangle opened for '+oaPosition.expiry+'; auto-exit monitors TP '+oa$('oaTp').value+'% of credit / SL '+oa$('oaSl').value+'× credit.';oaRender();return true}
 function oaExit(reason){if(!oaPosition)return false;const res=oaCalc();if(!res){oa$('oaNote').textContent='Current premium unavailable; keeping position open until valid marks return.';return false}const old=oaPosition;oaRealised+=res.net;oaWriteJournal(reason+' EXIT',res);oaArchiveClosedRows();oaPosition=null;oa$('oaNote').textContent='Paper position closed by '+reason+'. Estimated net P&L: '+oaCash(res.net);oaRender();return true}
