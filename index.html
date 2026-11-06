@@ -160,7 +160,7 @@ function oaSelectLegStopReplacement(side,oldSymbol,targetPremium){
 }
 function oaCheckIndividualLegStopLoss(sl){
  if(!oaPosition||oaPosition.adjusting||oaPosition.legs.length!==2)return false;
- const budget=oaPosition.credit*sl/2,qty=oaPosition.qty,feeRate=oaFeeRate();
+ const budget=Math.ceil(oaPosition.credit*sl/2),qty=oaPosition.qty,feeRate=oaFeeRate();
  if(!(budget>0))return false;
  for(const leg of [...oaPosition.legs]){
   const other=oaPosition.legs.find(l=>l!==leg);if(!other)continue;
