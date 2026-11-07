@@ -97,13 +97,45 @@ function oaBoldAscii(value){
  const normal='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',bold='𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵';
  return String(value).replace(/[A-Z0-9]/g,ch=>bold[normal.indexOf(ch)]);
 }
+const OA_ALERT_QUEUE_KEY='btcFlowDeskTelegramQueue_v1';
+let oaAlertQueue=[],oaAlertSending=false;
+function oaLoadAlertQueue(){try{const q=JSON.parse(localStorage.getItem(OA_ALERT_QUEUE_KEY)||'[]');oaAlertQueue=Array.isArray(q)?q:[]}catch(e){oaAlertQueue=[]}}
+function oaSaveAlertQueue(){try{localStorage.setItem(OA_ALERT_QUEUE_KEY,JSON.stringify(oaAlertQueue))}catch(e){console.warn('Telegram alert queue could not be saved:',e)}}
+async function oaFlushAlertQueue(){
+ if(oaAlertSending||!oaAlertQueue.length||!navigator.onLine)return;
+ oaAlertSending=true;
+ try{
+  while(oaAlertQueue.length){
+   const item=oaAlertQueue[0];
+   if(item.nextAttemptAt>Date.now())break;
+   try{
+    const response=await fetch(OA_ALERT_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:item.event,message:item.message,alert_id:item.id}),keepalive:true});
+    if(!response.ok)throw Error('HTTP '+response.status);
+    const contentType=response.headers.get('content-type')||'';
+    if(contentType.includes('application/json')){const result=await response.json();if(result&&result.ok===false)throw Error(result.error||'Worker rejected alert')}
+    oaAlertQueue.shift();oaSaveAlertQueue();
+   }catch(error){
+    item.attempts=(item.attempts||0)+1;
+    item.nextAttemptAt=Date.now()+Math.min(60000,2000*Math.pow(2,Math.min(item.attempts-1,5)));
+    oaSaveAlertQueue();
+    console.warn('Telegram alert pending; retry scheduled:',item.event,'attempt',item.attempts,error);
+    break;
+   }
+  }
+ }finally{oaAlertSending=false}
+}
 function oaNotify(event,message){
  try{
   const spotLine='\n\n₿ '+oaBoldAscii('BTC SPOT: '+(Number.isFinite(oaSpot)?'$'+oaFmt(oaSpot):'UNAVAILABLE'));
   const snapshot=oaPnlSnapshot();
-  fetch(OA_ALERT_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event,message:spotLine+message+snapshot})}).then(r=>{if(!r.ok)console.warn('Telegram alert failed:',event,r.status);}).catch(e=>console.warn('Telegram alert network error:',event,e));
- }catch(e){console.warn('Telegram alert error:',event,e)}
+  oaAlertQueue.push({id:'btc-'+Date.now()+'-'+Math.random().toString(36).slice(2,10),event,message:spotLine+message+snapshot,attempts:0,nextAttemptAt:0});
+  oaSaveAlertQueue();
+  oaFlushAlertQueue();
+ }catch(e){console.warn('Telegram alert queue error:',event,e)}
 }
+oaLoadAlertQueue();
+window.addEventListener('online',oaFlushAlertQueue);
+setInterval(oaFlushAlertQueue,3000);
 let oaClosedArchive=[];
 function oaLoadArchive(){try{const x=JSON.parse(localStorage.getItem(OA_ARCHIVE_KEY)||'[]');oaClosedArchive=Array.isArray(x)?x:[]}catch(e){oaClosedArchive=[]}}
 function oaSaveArchive(){try{localStorage.setItem(OA_ARCHIVE_KEY,JSON.stringify(oaClosedArchive));if(oa$('oaArchiveStatus')){oa$('oaArchiveStatus').textContent='LOCAL SAVE';oa$('oaArchiveStatus').className='big green'}}catch(e){if(oa$('oaArchiveStatus')){oa$('oaArchiveStatus').textContent='SAVE ERROR';oa$('oaArchiveStatus').className='big red'}}}
