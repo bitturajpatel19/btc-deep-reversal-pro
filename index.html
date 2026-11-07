@@ -93,8 +93,16 @@ function oaPnlSnapshot(){
  const complete=legs.length===0||priced===legs.length,unrealised=complete?gross-fees:NaN,total=complete?realised+unrealised:NaN;
  return '\n\n📊 P&L SNAPSHOT · '+new Date().toLocaleTimeString()+'\n🟦 Realised Net P&L: '+oaCash(realised)+'\n🟨 Unrealised Net P&L: '+(complete?oaCash(unrealised):'WAITING FOR LIVE QUOTES')+'\n💰 Total Net P&L: '+(complete?oaCash(total):'WAITING FOR LIVE QUOTES');
 }
+function oaBoldAscii(value){
+ const normal='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',bold='𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵';
+ return String(value).replace(/[A-Z0-9]/g,ch=>bold[normal.indexOf(ch)]);
+}
 function oaNotify(event,message){
- try{const snapshot=oaPnlSnapshot();fetch(OA_ALERT_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event,message:message+snapshot})}).then(r=>{if(!r.ok)console.warn('Telegram alert failed:',event,r.status);}).catch(e=>console.warn('Telegram alert network error:',event,e));}catch(e){console.warn('Telegram alert error:',e)}
+ try{
+  const spotLine='\n\n₿ '+oaBoldAscii('BTC SPOT: '+(Number.isFinite(oaSpot)?'$'+oaFmt(oaSpot):'UNAVAILABLE'));
+  const snapshot=oaPnlSnapshot();
+  fetch(OA_ALERT_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event,message:spotLine+message+snapshot})}).then(r=>{if(!r.ok)console.warn('Telegram alert failed:',event,r.status);}).catch(e=>console.warn('Telegram alert network error:',event,e));
+ }catch(e){console.warn('Telegram alert error:',event,e)}
 }
 let oaClosedArchive=[];
 function oaLoadArchive(){try{const x=JSON.parse(localStorage.getItem(OA_ARCHIVE_KEY)||'[]');oaClosedArchive=Array.isArray(x)?x:[]}catch(e){oaClosedArchive=[]}}
