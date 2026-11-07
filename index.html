@@ -126,8 +126,7 @@ async function oaFlushAlertQueue(){
 }
 function oaNotify(event,message){
  try{
-  const snapshot=oaPnlSnapshot();
-  oaAlertQueue.push({id:'btc-'+Date.now()+'-'+Math.random().toString(36).slice(2,10),event,message:message+snapshot,attempts:0,nextAttemptAt:0});
+  oaAlertQueue.push({id:'btc-'+Date.now()+'-'+Math.random().toString(36).slice(2,10),event,message:String(message||'').slice(0,3000),attempts:0,nextAttemptAt:0});
   oaSaveAlertQueue();
   oaFlushAlertQueue();
  }catch(e){console.warn('Telegram alert queue error:',event,e)}
