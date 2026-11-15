@@ -90,6 +90,8 @@ tbody tr:hover{background:#1b2a40}
 
 <script>
 (function(){
+const workspaceMode=new URLSearchParams(location.search).get('workspace');
+if(workspaceMode)document.body.classList.add('workspace-instance');
 const KEY='btcFlowDeskWorkspaceTabs_v1';
 const list=document.getElementById('workspaceTabList'),panels=document.getElementById('workspacePanels'),main=document.getElementById('workspaceMain');
 let tabs=[];
@@ -110,18 +112,17 @@ function render(){
   list.appendChild(wrap);
  });
 }
+function makeWorkspacePanel(t){
+ const panel=document.createElement('section');panel.className='workspace-panel';panel.dataset.tabId=t.id;panel.style.cssText='min-height:80vh';
+ const frame=document.createElement('iframe');frame.title=t.name+' dashboard';frame.src=location.pathname+'?workspace='+encodeURIComponent(t.id);frame.style.cssText='display:block;width:100%;height:calc(100vh - 125px);min-height:780px;border:0;border-radius:12px;background:var(--bg)';
+ frame.setAttribute('loading','eager');panel.appendChild(frame);return panel;
+}
 function addTab(){
  const id='ws_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),name='New Workspace '+(tabs.length+1);
- tabs.push({id,name});const panel=document.createElement('section');panel.className='workspace-panel';panel.dataset.tabId=id;panel.style.cssText='min-height:55vh';
- const card=document.createElement('div');card.className='card';card.style.cssText='min-height:260px;border-color:#38516f';
- const title=document.createElement('h2');title.textContent=name;
- const desc=document.createElement('div');desc.className='sub';desc.textContent='Independent workspace tab. Your existing BTC Short Strangle strategy, open paper positions and saved history remain in the first tab.';
- const note=document.createElement('div');note.className='check';note.style.marginTop='18px';note.textContent='This workspace is ready. A separate strategy or market-analysis module can be added here without changing the original strategy.';
- const rename=document.createElement('button');rename.type='button';rename.textContent='Rename workspace';rename.style.marginTop='14px';rename.addEventListener('click',()=>{const t=tabs.find(x=>x.id===id);const n=prompt('Workspace name:',t.name);if(n&&n.trim()){t.name=n.trim().slice(0,32);title.textContent=t.name;persist();render()}});
- card.append(title,desc,note,rename);panel.appendChild(card);panels.appendChild(panel);persist();activate(id);
+ const t={id,name};tabs.push(t);panels.appendChild(makeWorkspacePanel(t));persist();activate(id);
 }
 document.getElementById('workspaceAdd').addEventListener('click',addTab);
-tabs.forEach(t=>{const p=document.createElement('section');p.className='workspace-panel';p.dataset.tabId=t.id;p.style.cssText='min-height:55vh';const card=document.createElement('div');card.className='card';card.style.cssText='min-height:260px;border-color:#38516f';const h=document.createElement('h2');h.textContent=t.name;const d=document.createElement('div');d.className='sub';d.textContent='Saved workspace tab. Add a separate strategy or analysis module here.';card.append(h,d);p.appendChild(card);panels.appendChild(p)});
+tabs.forEach(t=>panels.appendChild(makeWorkspacePanel(t)));
 render();
 })();
 </script>
@@ -129,6 +130,8 @@ render();
 .workspace-panel{display:none}
 .workspace-panel.active{display:block}
 #workspaceTabBar{scrollbar-width:thin}
+body.workspace-instance #workspaceTabBar,body.workspace-instance #workspacePanels{display:none!important}
+body.workspace-instance #workspaceMain{display:block!important}
 </style>
 
 <script>
@@ -136,8 +139,10 @@ render();
 
 const oa$=id=>document.getElementById(id),oaNum=v=>{const n=Number(v);return Number.isFinite(n)?n:NaN},oaFmt=v=>Number.isFinite(v)?v.toLocaleString('en-US',{maximumFractionDigits:2}):'—',oaCash=v=>Number.isFinite(v)?(v>0?'+':'')+v.toFixed(2):'—';
 let oaTickers=[],oaPairs={},oaSpot=NaN,oaPosition=null,oaAutoOn=false,oaRealised=0,oaJournal=[],oaGlobalLocked=false;
-const OA_STORAGE_KEY='btcFlowDeskPaperState_v1';
-const OA_ARCHIVE_KEY='btcFlowDeskClosedArchive_v1';
+const workspaceId=new URLSearchParams(location.search).get('workspace');
+const workspaceSuffix=workspaceId?'_'+workspaceId:'';
+const OA_STORAGE_KEY='btcFlowDeskPaperState_v1'+workspaceSuffix;
+const OA_ARCHIVE_KEY='btcFlowDeskClosedArchive_v1'+workspaceSuffix;
 const OA_ALERT_URL='https://btc-telegram-alerts.bitturajpatel19.workers.dev/';
 function oaPnlSnapshot(){
  const realised=oaRealised,legs=oaPosition?.legs||[];let gross=0,fees=0,priced=0;
