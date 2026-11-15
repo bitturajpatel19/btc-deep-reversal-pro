@@ -204,7 +204,30 @@ function oaRenderArchive(){const rows=oaClosedArchive;const cash=n=>Number.isFin
 let oaPendingPosition=null;
 function oaSaveState(){try{localStorage.setItem(OA_STORAGE_KEY,JSON.stringify({version:1,position:oaPosition?{qty:oaPosition.qty,expiry:oaPosition.expiry,expiryKey:oaPosition.expiryKey,openedAt:oaPosition.openedAt,credit:oaPosition.credit,legs:oaPosition.legs.map(l=>({side:l.side,symbol:l.opt?.symbol,entry:l.entry,entryAt:l.entryAt}))}:null,autoOn:oaAutoOn,realised:oaRealised,journal:oaJournal,settings:{qty:document.getElementById('oaQty').value,tp:document.getElementById('oaTp').value,sl:document.getElementById('oaSl').value,fee:document.getElementById('oaFee').value,decay:document.getElementById('oaDecay').value,rise:document.getElementById('oaRise').value,globalLoss:document.getElementById('oaGlobalLoss').value,globalProfit:document.getElementById('oaGlobalProfit').value,globalLocked:oaGlobalLocked}}));}catch(e){oa$('oaNote').textContent='Could not save paper-trade state in this browser: '+e.message}}
 function oaLoadState(){try{const raw=localStorage.getItem(OA_STORAGE_KEY);if(!raw)return;const s=JSON.parse(raw);if(!s||s.version!==1)return;oaPendingPosition=s.position||null;oaAutoOn=!!s.autoOn;oaRealised=Number.isFinite(Number(s.realised))?Number(s.realised):0;oaJournal=Array.isArray(s.journal)?s.journal:[];if(s.settings){if(s.settings.qty!=null)oa$('oaQty').value=s.settings.qty;if(s.settings.tp!=null)oa$('oaTp').value=s.settings.tp;if(s.settings.sl!=null)oa$('oaSl').value=s.settings.sl;if(s.settings.fee!=null)oa$('oaFee').value=s.settings.fee;if(s.settings.decay!=null)oa$('oaDecay').value=s.settings.decay;if(s.settings.rise!=null)oa$('oaRise').value=s.settings.rise;if(s.settings.globalLoss!=null)oa$('oaGlobalLoss').value=s.settings.globalLoss;if(s.settings.globalProfit!=null)oa$('oaGlobalProfit').value=s.settings.globalProfit;oaGlobalLocked=!!s.settings.globalLocked;}if(!oaGlobalLimitsReady()||!oaDecayReady()||!oaRiseReady()||oaGlobalLocked)oaAutoOn=false;}catch(e){console.warn('Saved paper state could not be loaded',e)}}
-function oaRestorePosition(){if(!oaPendingPosition)return;const saved=oaPendingPosition;const legs=(saved.legs||[]).map(l=>({side:l.side,opt:oaTickers.find(o=>o.symbol===l.symbol),entry:Number(l.entry),entryAt:Number(l.entryAt)||saved.openedAt}));if(legs.length===2&&legs.every(l=>l.opt&&l.entry>0)){const pe=legs.find(l=>l.opt.symbol==='P-BTC-72000-061126'),ce=legs.find(l=>l.opt.symbol==='C-BTC-82000-061126');if(pe&&ce){pe.entry=248;ce.entry=236;saved.qty=1;saved.credit=484;oa$('oaQty').value='1';}oaPosition={qty:Number(saved.qty)||1,expiry:saved.expiry||'',expiryKey:saved.expiryKey||oa$('oaExpiry').value,openedAt:Number(saved.openedAt)||Date.now(),credit:legs.reduce((sum,l)=>sum+l.entry,0)*(Number(saved.qty)||1),legs};oaPendingPosition=null;oa$('oaNote').textContent=pe&&ce?'Current paper trade entry corrected from your provided values: PE 248, CE 236, quantity 1 each. Live P&L updates from Delta option quotes.':'Saved paper trade restored. Live P&L updates as fresh option quotes arrive.';oaSaveState();oaWsExpiry='';oaWsSendSubscriptions();}else{oa$('oaNote').textContent='Saved trade is waiting for its option symbols/quotes to return from Delta feed. It has not been cleared.';}}
+function oaRestorePosition(){
+ if(!oaPendingPosition)return;
+ const saved=oaPendingPosition,rawLegs=Array.isArray(saved.legs)?saved.legs:[];
+ const legs=rawLegs.map(l=>{
+  const symbol=String(l.symbol||''),live=oaTickers.find(o=>o.symbol===symbol);
+  const strike=Number((symbol.match(/^[CP]-BTC-(\\d+(?:\\.\\d+)?)-/)||[])[1]);
+  const placeholder=live||{symbol,contract_type:symbol.startsWith('P-')?'put_options':'call_options',strike_price:Number.isFinite(strike)?strike:undefined,quotes:{}};
+  return {side:l.side|| (symbol.startsWith('P-')?'SELL PE':'SELL CE'),opt:placeholder,entry:Number(l.entry),entryAt:Number(l.entryAt)||saved.openedAt};
+ });
+ if(legs.length>0&&legs.every(l=>l.opt?.symbol&&l.entry>0)){
+  const pe=legs.find(l=>l.side==='SELL PE'||String(l.opt.symbol).startsWith('P-'));
+  const ce=legs.find(l=>l.side==='SELL CE'||String(l.opt.symbol).startsWith('C-'));
+  if(legs.length===2&&pe&&ce&&pe.opt.symbol==='P-BTC-72000-061126'&&ce.opt.symbol==='C-BTC-82000-061126'){pe.entry=248;ce.entry=236;saved.qty=1;saved.credit=484;oa$('oaQty').value='1';}
+  const qty=Number(saved.qty)>0?Number(saved.qty):1;
+  oaPosition={qty,expiry:saved.expiry||'',expiryKey:saved.expiryKey||oa$('oaExpiry').value,openedAt:Number(saved.openedAt)||Date.now(),credit:legs.reduce((sum,l)=>sum+l.entry,0)*qty,legs};
+  oaPendingPosition=null;
+  if(oaPosition.expiryKey&&oaPairs[oaPosition.expiryKey])oa$('oaExpiry').value=oaPosition.expiryKey;
+  const waiting=legs.some(l=>!oaTickers.some(o=>o.symbol===l.opt.symbol));
+  oa$('oaNote').textContent=waiting?'Saved open order restored from browser storage. One or more contracts are not currently in the live feed; order and entry details are preserved and live MTM/risk exits will wait for fresh quotes.':'Saved paper trade restored. Live P&L updates as fresh option quotes arrive.';
+  oaSaveState();oaWsExpiry='';oaWsSendSubscriptions();
+ }else{
+  oa$('oaNote').textContent='Saved order data is incomplete or waiting for its saved contract symbols. The saved record has been retained; it has not been cleared.';
+ }
+}
 function oaRenderJournal(){
  const active=oaPosition?.legs||[];
  if(oa$('oaDashFeed'))oa$('oaDashFeed').textContent=(oaWs&&oaWs.readyState===WebSocket.OPEN?'LIVE WEBSOCKET':'REST / WAITING')+' · Updated '+new Date().toLocaleTimeString();
