@@ -90,7 +90,44 @@ tbody tr:hover{background:#1b2a40}
 
 <script>
 (function(){
-const workspaceMode=new URLSearchParams(location.search).get('workspace');
+const params=new URLSearchParams(location.search);
+const backtestMode=params.get('backtest')==='1';
+if(backtestMode){
+ document.body.classList.add('backtest-instance');
+ const nav=document.getElementById('workspaceTabBar'),main=document.getElementById('workspaceMain'),panels=document.getElementById('workspacePanels');
+ if(nav)nav.style.display='none';if(panels)panels.style.display='none';
+ if(main){main.classList.add('active');main.innerHTML=`
+ <header class="top"><div><div class="brand">◈ BTC FLOWDESK <span style="color:var(--blue)">PRO</span> / BACKTEST</div><div class="muted">2-year historical tick replay · isolated from live and paper workspaces</div></div><div class="status" id="btStatus">WAITING FOR HISTORICAL TICK DATA</div></header>
+ <section class="card" style="border:2px solid #5578a8;margin-bottom:10px"><div class="top"><div><div class="label">Backtesting workspace</div><h2 style="margin:6px 0">BTC SHORT STRANGLE · HISTORICAL REPLAY</h2><div class="sub">This workspace is isolated. It does not connect to your personal Delta account and cannot place live orders.</div></div><span class="tag">2 YEARS · TICK DATA</span></div>
+ <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div class="check"><div class="label">Historical period</div><div class="big">2 Years</div><div class="sub">User-selected period</div></div><div class="check"><div class="label">Replay precision</div><div class="big">Tick-by-tick</div><div class="sub">Requires historical option quote ticks</div></div></div></section>
+ <section class="card" style="margin-bottom:10px"><h2>1. Historical tick dataset</h2><p class="sub">Upload a CSV export containing historical option quotes and underlying BTC spot at each timestamp. No historical data is included yet; this upload is only validated locally in your browser.</p><div class="check"><label class="label" for="btFile">Select historical tick CSV</label><input id="btFile" type="file" accept=".csv,text/csv" style="display:block;width:100%;margin-top:10px"><div id="btFileInfo" class="sub" style="margin-top:8px">No dataset selected</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button id="btValidate" type="button">Validate dataset</button><button id="btClear" type="button">Clear selection</button></div><div id="btValidation" class="signal" style="margin-top:10px">Required CSV columns: timestamp, spot, expiry, option_type, strike, bid, ask, symbol.</div></section>
+ <section class="card" style="margin-bottom:10px"><h2>2. Strategy parameters to compare</h2><div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))"><label class="check"><div class="label">Decay trigger percentages</div><input id="btDecay" value="10,15,20,25,30,35" style="width:100%;margin-top:8px;padding:10px;background:#0b1422;color:#fff;border:1px solid #354968;border-radius:8px"><div class="sub">Comma-separated values</div></label><label class="check"><div class="label">Opposite leg rise trigger (%)</div><input id="btRise" type="number" min="0" max="100" step="0.5" value="7" style="width:100%;margin-top:8px;padding:10px;background:#0b1422;color:#fff;border:1px solid #354968;border-radius:8px"><div class="sub">Default existing strategy rule</div></label><label class="check"><div class="label">OTM strike distance (%)</div><input id="btOtm" type="number" min="1" max="30" step="0.5" value="7" style="width:100%;margin-top:8px;padding:10px;background:#0b1422;color:#fff;border:1px solid #354968;border-radius:8px"></label><label class="check"><div class="label">Premium matching tolerance (%)</div><input id="btMatch" type="number" min="0" max="100" step="0.5" value="5" style="width:100%;margin-top:8px;padding:10px;background:#0b1422;color:#fff;border:1px solid #354968;border-radius:8px"></label></div><div class="sub" style="margin-top:8px">Backtest will also need the agreed individual-leg and combined stop-loss settings, contract multiplier, fee schedule and slippage assumptions before P&amp;L can be considered realistic.</div></section>
+ <section class="card"><h2>3. Comparison results</h2><div class="signal" id="btRunStatus">Not run — waiting for a validated historical tick dataset and replay engine.</div><div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Decay</th><th>Trades</th><th>Win rate</th><th>Net P&amp;L</th><th>Max drawdown</th><th>Profit factor</th></tr></thead><tbody id="btResults"><tr><td colspan="6" style="text-align:center;color:var(--muted)">No backtest results yet</td></tr></tbody></table></div></section>
+ <div class="foot">Backtest workspace only. Historical tick data availability, completeness and quality must be verified before results can be generated. No data is uploaded to a server by this page.</div>`;
+  const file=main.querySelector('#btFile'),info=main.querySelector('#btFileInfo'),validation=main.querySelector('#btValidation');
+  let selected=null,valid=false;
+  file.addEventListener('change',()=>{selected=file.files&&file.files[0]||null;valid=false;info.textContent=selected?selected.name+' · '+(selected.size/1048576).toFixed(1)+' MB':'No dataset selected';validation.textContent=selected?'File selected. Press Validate dataset.':'Required CSV columns: timestamp, spot, expiry, option_type, strike, bid, ask, symbol.';document.getElementById('btStatus').textContent='DATASET NOT VALIDATED';});
+  document.getElementById('btClear').addEventListener('click',()=>{file.value='';selected=null;valid=false;info.textContent='No dataset selected';validation.textContent='Required CSV columns: timestamp, spot, expiry, option_type, strike, bid, ask, symbol.';document.getElementById('btStatus').textContent='WAITING FOR HISTORICAL TICK DATA';});
+  document.getElementById('btValidate').addEventListener('click',()=>{
+   if(!selected){validation.textContent='Please select a CSV file first.';return}
+   if(selected.size>200*1024*1024){validation.textContent='File exceeds the 200 MB browser validation limit. Large two-year tick datasets need chunked backend ingestion.';return}
+   const reader=new FileReader();reader.onload=()=>{
+    const raw=String(reader.result||''),first=(raw.split(/\r?\n/,1)[0]||'').replace(/^\uFEFF/,'');
+    const headers=first.split(',').map(x=>x.trim().replace(/^["']|["']$/g,'').toLowerCase());
+    const required=['timestamp','spot','expiry','option_type','strike','bid','ask','symbol'];
+    const missing=required.filter(x=>!headers.includes(x));
+    if(missing.length){valid=false;validation.textContent='Missing required columns: '+missing.join(', ');document.getElementById('btStatus').textContent='DATASET INVALID';return}
+    const lines=raw.split(/\r?\n/).filter(Boolean),count=Math.max(0,lines.length-1);
+    valid=count>0;info.textContent=selected.name+' · '+count.toLocaleString()+' data rows · '+(selected.size/1048576).toFixed(1)+' MB';
+    validation.textContent=valid?'CSV structure passed basic header/row validation. This does not verify tick continuity, missing quotes, timestamp quality or historical coverage.':'No data rows found.';
+    document.getElementById('btStatus').textContent=valid?'CSV STRUCTURE VALID · NOT BACKTESTED':'DATASET INVALID';
+    document.getElementById('btRunStatus').textContent='Dataset headers validated. Actual strategy replay is not yet enabled; two years of historical option tick data and the replay engine must be integrated and verified first.';
+   };reader.onerror=()=>{validation.textContent='Could not read this file.'};reader.readAsText(selected);
+  });
+ }
+ return;
+}
+const workspaceMode=params.get('workspace');
 if(workspaceMode)document.body.classList.add('workspace-instance');
 const KEY='btcFlowDeskWorkspaceTabs_v1';
 const list=document.getElementById('workspaceTabList'),panels=document.getElementById('workspacePanels'),main=document.getElementById('workspaceMain');
@@ -101,11 +138,11 @@ function persist(){try{localStorage.setItem(KEY,JSON.stringify(tabs))}catch(_e){
 function activate(id){active=id;main.classList.toggle('active',id==='main');panels.querySelectorAll('.workspace-panel').forEach(p=>p.classList.toggle('active',p.dataset.tabId===id));render()}
 function render(){
  list.innerHTML='';
- const all=[{id:'main',name:'BTC Short Strangle'},...tabs];
+ const all=[{id:'main',name:'BTC Short Strangle'},{id:'backtest',name:'BTC Backtesting'},...tabs];
  all.forEach(t=>{
   const wrap=document.createElement('div');wrap.style.cssText='display:flex;align-items:center;gap:3px;flex:0 0 auto';
   const b=document.createElement('button');b.type='button';b.textContent=t.name;b.style.cssText='white-space:nowrap;'+(active===t.id?'background:#23446a;border-color:#79adff;color:#fff':'background:#101a29;color:#b8c6d9');b.addEventListener('click',()=>activate(t.id));wrap.appendChild(b);
-  if(t.id!=='main'){
+  if(t.id!=='main'&&t.id!=='backtest'){
    const edit=document.createElement('button');edit.type='button';edit.textContent='✎';edit.title='Rename tab';edit.style.cssText='padding:7px 8px';edit.addEventListener('click',()=>{const n=prompt('Workspace name:',t.name);if(n&&n.trim()){t.name=n.trim().slice(0,32);persist();render()}});wrap.appendChild(edit);
    const close=document.createElement('button');close.type='button';close.textContent='×';close.title='Close tab';close.style.cssText='padding:7px 9px;color:#ff9aaa';close.addEventListener('click',()=>{if(!confirm('Close workspace "'+t.name+'"? Its workspace panel will be removed.'))return;tabs=tabs.filter(x=>x.id!==t.id);const p=panels.querySelector('[data-tab-id="'+t.id+'"]');if(p)p.remove();if(active===t.id)active='main';persist();activate(active)});wrap.appendChild(close);
   }
@@ -114,7 +151,7 @@ function render(){
 }
 function makeWorkspacePanel(t){
  const panel=document.createElement('section');panel.className='workspace-panel';panel.dataset.tabId=t.id;panel.style.cssText='min-height:80vh';
- const frame=document.createElement('iframe');frame.title=t.name+' dashboard';frame.src=location.pathname+'?workspace='+encodeURIComponent(t.id);frame.style.cssText='display:block;width:100%;height:calc(100vh - 125px);min-height:780px;border:0;border-radius:12px;background:var(--bg)';
+ const frame=document.createElement('iframe');frame.title=t.name+' dashboard';frame.src=t.id==='backtest'?location.pathname+'?backtest=1':location.pathname+'?workspace='+encodeURIComponent(t.id);frame.style.cssText='display:block;width:100%;height:calc(100vh - 125px);min-height:780px;border:0;border-radius:12px;background:var(--bg)';
  frame.setAttribute('loading','eager');panel.appendChild(frame);return panel;
 }
 function addTab(){
@@ -122,6 +159,7 @@ function addTab(){
  const t={id,name};tabs.push(t);panels.appendChild(makeWorkspacePanel(t));persist();activate(id);
 }
 document.getElementById('workspaceAdd').addEventListener('click',addTab);
+panels.appendChild(makeWorkspacePanel({id:'backtest',name:'BTC Backtesting'}));
 tabs.forEach(t=>panels.appendChild(makeWorkspacePanel(t)));
 render();
 })();
@@ -144,7 +182,7 @@ body.workspace-instance #workspaceMain{display:block!important}
 
 <script>
 (function(){
-
+if(new URLSearchParams(location.search).get('backtest')==='1')return;
 const oa$=id=>document.getElementById(id),oaNum=v=>{const n=Number(v);return Number.isFinite(n)?n:NaN},oaFmt=v=>Number.isFinite(v)?v.toLocaleString('en-US',{maximumFractionDigits:2}):'—',oaCash=v=>Number.isFinite(v)?(v>0?'+':'')+v.toFixed(2):'—';
 let oaTickers=[],oaPairs={},oaSpot=NaN,oaPosition=null,oaAutoOn=false,oaRealised=0,oaJournal=[],oaGlobalLocked=false;
 const workspaceId=new URLSearchParams(location.search).get('workspace');
