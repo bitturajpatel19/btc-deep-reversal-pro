@@ -267,12 +267,12 @@ function oaCheckDecayAdjustments(){
   }
   oaPosition.adjusting=true;
   const qty=oaPosition.qty,entry=leg.entry,gross=(entry-ask)*qty,fees=(entry+ask)*qty*oaFeeRate(),net=gross-fees;
-  oaRealised+=net;oaWriteAdjustmentRow('20% DECAY PROFIT BOOK',leg,ask,gross,fees,net,entry*qty);
+  oaRealised+=net;oaWriteAdjustmentRow('MANUAL '+decayPct+'% DECAY PROFIT BOOK',leg,ask,gross,fees,net,entry*qty);
   const idx=oaPosition.legs.findIndex(l=>l.side===leg.side);if(idx<0){oaPosition.adjusting=false;return}
   oaPosition.legs.splice(idx,1,{side:leg.side,opt:replacement.opt,entry:replacement.bid,entryAt:Date.now()});
   oaPosition.credit=Math.max(0,oaPosition.legs.reduce((sum,l)=>sum+l.entry,0)*qty);
   oaWriteAdjustmentRow('ADJUSTMENT RE-ENTRY',oaPosition.legs[idx],NaN,0,0,0,replacement.bid*qty);
-  oaNotify('DECAY_ADJUSTMENT','🔄 20% PREMIUM DECAY ADJUSTMENT\nBooked leg: '+(leg.side.includes('PE')?'PE':'CE')+' | Strike: '+oaFmt(oaStrike(leg.opt))+'\nOriginal entry: ₹'+oaFmt(leg.entry)+'\nBuyback ask: ₹'+oaFmt(ask)+'\nRealised net P&L: '+oaCash(net)+'\n\n🆕 Replacement: '+(leg.side.includes('PE')?'PE':'CE')+' | Strike: '+oaFmt(oaStrike(replacement.opt))+'\nNew sell premium: ₹'+oaFmt(replacement.bid)+'\n↔️ Opposite leg remains open\n🏷️ Mode: PAPER TRADING');
+  oaNotify('DECAY_ADJUSTMENT','🔄 '+decayPct+'% PREMIUM DECAY ADJUSTMENT\nBooked leg: '+(leg.side.includes('PE')?'PE':'CE')+' | Strike: '+oaFmt(oaStrike(leg.opt))+'\nOriginal entry: ₹'+oaFmt(leg.entry)+'\nBuyback ask: ₹'+oaFmt(ask)+'\nRealised net P&L: '+oaCash(net)+'\n\n🆕 Replacement: '+(leg.side.includes('PE')?'PE':'CE')+' | Strike: '+oaFmt(oaStrike(replacement.opt))+'\nNew sell premium: ₹'+oaFmt(replacement.bid)+'\n↔️ Opposite leg remains open\n🏷️ Mode: PAPER TRADING');
   oa$('oaNote').textContent=leg.side+' premium decay reached '+decayPct+'% and opposite leg moved at least 7%: profit booked on '+leg.opt.symbol+' and replacement opened at '+replacement.opt.symbol+'. Selected current fresh sell bid '+oaFmt(replacement.bid)+' closest to opposite leg original entry premium '+oaFmt(otherLeg.entry)+' within 5–9% OTM (target ~7%).';
   if(oa$('oaRiskStatus'))oa$('oaRiskStatus').textContent='MANUAL DECAY ADJUSTMENT · COMPLETED — '+leg.side+' replaced; opposite leg remains open.';
   oaPosition.adjusting=false;oaSaveState();break;
