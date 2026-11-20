@@ -255,7 +255,7 @@ function oaRestorePosition(){
  const saved=oaPendingPosition,rawLegs=Array.isArray(saved.legs)?saved.legs:[];
  const legs=rawLegs.map(l=>{
   const symbol=String(l.symbol||''),live=oaTickers.find(o=>o.symbol===symbol);
-  const strike=Number((symbol.match(/^[CP]-BTC-(\\d+(?:\\.\\d+)?)-/)||[])[1]);
+  const strike=Number((symbol.match(/^[CP]-BTC-(\d+(?:\.\d+)?)-/)||[])[1]);
   const placeholder=live||{symbol,contract_type:symbol.startsWith('P-')?'put_options':'call_options',strike_price:Number.isFinite(strike)?strike:undefined,quotes:{}};
   return {side:l.side|| (symbol.startsWith('P-')?'SELL PE':'SELL CE'),opt:placeholder,entry:Number(l.entry),entryAt:Number(l.entryAt)||saved.openedAt};
  });
@@ -308,7 +308,8 @@ oaLoadState();
 function oaExpiryFromSymbol(sym){const m=String(sym||'').match(/-(\d{6})$/);if(!m)return null;const s=m[1],day=+s.slice(0,2),month=+s.slice(2,4),year=2000+(+s.slice(4,6));const d=new Date(year,month-1,day,23,59,59);return Number.isNaN(d.getTime())?null:d}
 function oaStrike(o){return oaNum(o.strike_price??(String(o.symbol).match(/^[CP]-BTC-(\d+(?:\.\d+)?)-/)||[])[1])}
 function oaMark(o){return oaNum(o.mark_price??o.close??o.last_price??o.quotes?.best_bid)}
-function oaBid(o){const b=oaNum(o.quotes?.best_bid);return b>0?b:oaMark(o)}\nfunction oaEntryQuote(o){const q=o?.quotes||{},bid=oaNum(q.best_bid),ask=oaNum(q.best_ask),stamp=Math.max(Number(q.live_updated_at)||0,Number(q.quote_snapshot_at)||0);if(!(bid>0&&ask>0&&ask>=bid&&stamp>0&&Date.now()-stamp<=12000))return null;return {bid,ask,stamp,spread:ask-bid,spreadPct:(ask-bid)/((ask+bid)/2)*100}}
+function oaBid(o){const b=oaNum(o.quotes?.best_bid);return b>0?b:oaMark(o)}
+function oaEntryQuote(o){const q=o?.quotes||{},bid=oaNum(q.best_bid),ask=oaNum(q.best_ask),stamp=Math.max(Number(q.live_updated_at)||0,Number(q.quote_snapshot_at)||0);if(!(bid>0&&ask>0&&ask>=bid&&stamp>0&&Date.now()-stamp<=12000))return null;return {bid,ask,stamp,spread:ask-bid,spreadPct:(ask-bid)/((ask+bid)/2)*100}}
 function oaExpiryKey(o){const d=oaExpiryFromSymbol(o.symbol);return d?d.toISOString().slice(0,10):''}
 let oaWs=null,oaWsTimer=null,oaWsExpiry='',oaLastSpotUpdate=0,oaRenderTimer=null,oaLastWsMessage=0,oaWsWatchdog=null,oaWsConnecting=false;
 function oaQueueRender(){if(oaRenderTimer!==null)return;oaRenderTimer=setTimeout(()=>{oaRenderTimer=null;oaRender();oaRenderJournal()},200)}
