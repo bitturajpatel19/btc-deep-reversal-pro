@@ -151,7 +151,7 @@ function render(){
 }
 function makeWorkspacePanel(t){
  const panel=document.createElement('section');panel.className='workspace-panel';panel.dataset.tabId=t.id;panel.style.cssText='min-height:80vh';
- const frame=document.createElement('iframe');frame.title=t.name+' dashboard';frame.src=t.id==='backtest'?location.pathname+'?backtest=1':location.pathname+'?workspace='+encodeURIComponent(t.id);frame.style.cssText='display:block;width:100%;height:calc(100vh - 125px);min-height:780px;border:0;border-radius:12px;background:var(--bg)';
+ const frame=document.createElement('iframe');frame.title=t.name+' dashboard';const cacheVersion=new URLSearchParams(location.search).get('v')||Date.now();frame.src=t.id==='backtest'?location.pathname+'?backtest=1&v='+encodeURIComponent(cacheVersion):location.pathname+'?workspace='+encodeURIComponent(t.id)+'&v='+encodeURIComponent(cacheVersion);frame.style.cssText='display:block;width:100%;height:calc(100vh - 125px);min-height:780px;border:0;border-radius:12px;background:var(--bg)';
  frame.setAttribute('loading','eager');panel.appendChild(frame);return panel;
 }
 function addTab(){
