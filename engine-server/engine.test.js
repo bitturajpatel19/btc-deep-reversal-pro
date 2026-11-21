@@ -21,7 +21,7 @@ function fixture(t, seed) {
     fetch: async () => { throw new Error('fetch must be stubbed for this test'); }
   };
   vm.createContext(sandbox);
-  vm.runInContext(boot + '\n;globalThis.__engine={state,defaults,choosePair,quoteFresh,replacement,decayCheck,riskChecks,engine,refresh,getRefreshLock:()=>refreshInFlight,pnl,load,save,openPosition,closePosition};', sandbox);
+  vm.runInContext(boot + '\n;globalThis.__engine={state,defaults,choosePair,quoteFresh,replacement,decayCheck,type,expiry,strike,riskChecks,engine,refresh,getRefreshLock:()=>refreshInFlight,pnl,load,save,openPosition,closePosition};', sandbox);
   return { e: sandbox.__engine, sandbox, dir };
 }
 const exp = '2027-01-29';
@@ -44,7 +44,7 @@ function base(t) {
 test('pair selector chooses closest premium pair, then 7% OTM tie-break', (t) => {
   const e = base(t);
   const pair = e.choosePair(exp);
-  assert.ok(pair, JSON.stringify({spot:e.state.spot,expiry:exp,quotes:e.state.tickers.map(o=>({symbol:o.symbol,expiry:o.expiry_date,type:o.contract_type,strike:o.strike_price,bid:o.quotes.best_bid,ask:o.quotes.best_ask,fresh:e.quoteFresh(o)}))}));
+  assert.ok(pair, JSON.stringify({spot:e.state.spot,expiry:exp,quotes:e.state.tickers.map(o=>({symbol:o.symbol,expiry:o.expiry_date,expiryFn:e.expiry(o),typeRaw:o.contract_type,typeFn:e.type(o),strike:o.strike_price,strikeFn:e.strike(o),otm:o.contract_type==='put'?((e.state.spot-e.strike(o))/e.state.spot):((e.strike(o)-e.state.spot)/e.state.spot),bid:o.quotes.best_bid,ask:o.quotes.best_ask,fresh:e.quoteFresh(o)}))}));
   assert.equal(pair.p.symbol, 'P-BTC-93000-20270129');
   assert.equal(pair.c.symbol, 'C-BTC-107000-20270129');
 });
