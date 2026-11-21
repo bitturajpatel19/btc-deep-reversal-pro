@@ -22,7 +22,7 @@ function fixture(t, seed) {
     fetch: async () => { throw new Error('fetch must be stubbed for this test'); }
   };
   vm.createContext(sandbox);
-  vm.runInContext(boot + '\\n;globalThis.__engine={state,defaults,choosePair,quoteFresh,replacement,decayCheck,riskChecks,engine,refresh,getRefreshLock:()=>refreshInFlight,pnl,load,save,openPosition,closePosition};', sandbox);
+  vm.runInContext(boot + '\n;globalThis.__engine={state,defaults,choosePair,quoteFresh,replacement,decayCheck,riskChecks,engine,refresh,getRefreshLock:()=>refreshInFlight,pnl,load,save,openPosition,closePosition};', sandbox);
   return { e: sandbox.__engine, sandbox, dir };
 }
 const exp = '2027-01-29';
