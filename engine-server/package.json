@@ -1,0 +1,8 @@
+{
+  "name": "btc-flowdesk-pro-paper-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Isolated server-side PRO paper trading engine",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=20" }
+}
