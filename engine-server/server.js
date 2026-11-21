@@ -26,8 +26,17 @@ function expiry(o){return o.expiry_date||o.expiry||o.contract_expiry}
 function expiries(){const all=[...new Set(state.tickers.map(expiry).filter(Boolean))].sort();return all}
 function selectedExpiry(){const list=expiries();if(state.config.expiryKey&&list.includes(state.config.expiryKey))return state.config.expiryKey;return list[0]||''}
 function choosePair(expKey=selectedExpiry()){
- const list=state.tickers.filter(o=>expiry(o)===expKey&&quoteFresh(o)), puts=list.filter(o=>type(o)==='put'&&strike(o)<state.spot&&((state.spot-strike(o))/state.spot)>=.05&&((state.spot-strike(o))/state.spot)<=.09),calls=list.filter(o=>type(o)==='call'&&strike(o)>state.spot&&((strike(o)-state.spot)/state.spot)>=.05&&((strike(o)-state.spot)/state.sp)<=.09);
- let best=null;for(const p of puts)for(const c of calls){const pb=bid(p),cb=bid(c);if(!(pb>0&&cb>0))continue;const avg=(pb+cb)/2,score=Math.abs(pb-cb)/Math.max(avg,1e-9),td=Math.abs((state.spot-strike(p))/state.spot*100-7)+Math.abs((strike(c)-state.spot)/state.spot*100-7);if(!best||score<best.score-1e-9||(Math.abs(score-best.score)<1e-9&&td<best.td))best={p,c,score,td};}return best;
+ const spot=num(state.spot);if(!(spot>0))return null;
+ const list=state.tickers.filter(o=>String(expiry(o)??'')===String(expKey??'')&&quoteFresh(o));
+ const puts=list.map(o=>({o,k:strike(o),d:(spot-strike(o))/spot})).filter(x=>type(x.o)==='put'&&Number.isFinite(x.k)&&x.k<spot&&x.d>=.05&&x.d<=.09);
+ const calls=list.map(o=>({o,k:strike(o),d:(strike(o)-spot)/spot})).filter(x=>type(x.o)==='call'&&Number.isFinite(x.k)&&x.k>spot&&x.d>=.05&&x.d<=.09);
+ let best=null;
+ for(const p of puts)for(const c of calls){
+  const pb=bid(p.o),cb=bid(c.o);if(!(pb>0&&cb>0))continue;
+  const avg=(pb+cb)/2,score=Math.abs(pb-cb)/Math.max(avg,1e-9),td=Math.abs(p.d*100-7)+Math.abs(c.d*100-7);
+  if(!best||score<best.score-1e-9||(Math.abs(score-best.score)<1e-9&&td<best.td))best={p:p.o,c:c.o,score,td};
+ }
+ return best;
 }
 function getQuote(symbol){return state.tickers.find(o=>o.symbol===symbol)}
 function pnl(){if(!state.position)return null;let gross=0,fees=0;for(const l of state.position.legs){const o=getQuote(l.symbol);if(!quoteFresh(o))return null;gross+=(l.entry-ask(o))*state.position.qty;fees+=(l.entry+ask(o))*state.position.qty*state.config.feeRate;}return {gross,fees,net:gross-fees}}
