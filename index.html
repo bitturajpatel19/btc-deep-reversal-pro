@@ -384,9 +384,9 @@ function oaCheckDecayAdjustments(){
   }
   const decayPct=oaNum(oa$('oaDecay')?.value);if(!(Number.isFinite(decayPct)&&decayPct>0&&decayPct<100)){if(oa$('oaRiskStatus'))oa$('oaRiskStatus').textContent='PREMIUM DECAY BOOK · WAITING — enter a valid decay trigger percentage (1–99%) before enabling orders.';return}if(!(leg.entry>0&&ask<=leg.entry*(1-decayPct/100)))continue;
   const risePct=oaNum(oa$('oaRise')?.value);if(!(Number.isFinite(risePct)&&risePct>0&&risePct<100)){if(oa$('oaRiskStatus'))oa$('oaRiskStatus').textContent='OPPOSITE LEG RISE TRIGGER · WAITING — enter a valid rise trigger percentage (0.1–99%) before enabling adjustments.';return}if(!(otherLeg.entry>0&&otherAsk>=otherLeg.entry*(1+risePct/100)))continue;
-  const replacement=oaSelectLegStopReplacement(leg.side,leg.opt.symbol,otherLeg.entry);
+  const otherBid=oaNum(oq.best_bid);const replacement=oaSelectLegStopReplacement(leg.side,leg.opt.symbol,otherBid);
   if(!replacement){
-   if(oa$('oaRiskStatus'))oa$('oaRiskStatus').textContent='MANUAL DECAY TRIGGER MET · WAITING — no fresh 5–9% OTM replacement sell bid sufficiently available to match opposite leg original entry premium '+oaFmt(otherLeg.entry)+'.';
+   if(oa$('oaRiskStatus'))oa$('oaRiskStatus').textContent='MANUAL DECAY TRIGGER MET · WAITING — no fresh 5–9% OTM replacement sell bid sufficiently available to match opposite leg LIVE bid premium '+oaFmt(otherBid)+'.';
    if(oa$('oaNote'))oa$('oaNote').textContent='Decay conditions met for '+leg.side+', but no valid fresh replacement quote is available. Position remains unchanged; system will retry on fresh market updates.';
    return;
   }
@@ -398,7 +398,7 @@ function oaCheckDecayAdjustments(){
   oaPosition.credit=Math.max(0,oaPosition.legs.reduce((sum,l)=>sum+l.entry,0)*qty);
   oaWriteAdjustmentRow('ADJUSTMENT RE-ENTRY',oaPosition.legs[idx],NaN,0,0,0,replacement.bid*qty);
   oaNotify('DECAY_ADJUSTMENT','🔄 '+decayPct+'% PREMIUM DECAY ADJUSTMENT\nBooked leg: '+(leg.side.includes('PE')?'PE':'CE')+' | Strike: '+oaFmt(oaStrike(leg.opt))+'\nOriginal entry: ₹'+oaFmt(leg.entry)+'\nBuyback ask: ₹'+oaFmt(ask)+'\nRealised net P&L: '+oaCash(net)+'\n\n🆕 Replacement: '+(leg.side.includes('PE')?'PE':'CE')+' | Strike: '+oaFmt(oaStrike(replacement.opt))+'\nNew sell premium: ₹'+oaFmt(replacement.bid)+'\n↔️ Opposite leg remains open\n🏷️ Mode: PAPER TRADING');
-  oa$('oaNote').textContent=leg.side+' premium decay reached '+decayPct+'% and opposite leg moved at least 7%: profit booked on '+leg.opt.symbol+' and replacement opened at '+replacement.opt.symbol+'. Selected current fresh sell bid '+oaFmt(replacement.bid)+' closest to opposite leg original entry premium '+oaFmt(otherLeg.entry)+' within 5–9% OTM (target ~7%).';
+  oa$('oaNote').textContent=leg.side+' premium decay reached '+decayPct+'% and opposite leg moved at least 7%: profit booked on '+leg.opt.symbol+' and replacement opened at '+replacement.opt.symbol+'. Selected current fresh sell bid '+oaFmt(replacement.bid)+' closest to opposite leg LIVE bid premium '+oaFmt(otherBid)+' within 5–9% OTM (target ~7%).';
   if(oa$('oaRiskStatus'))oa$('oaRiskStatus').textContent='MANUAL DECAY ADJUSTMENT · COMPLETED — '+leg.side+' replaced; opposite leg remains open.';
   oaPosition.adjusting=false;oaSaveState();break;
  }
