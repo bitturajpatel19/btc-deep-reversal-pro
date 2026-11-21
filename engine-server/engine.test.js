@@ -6,7 +6,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
-const start = source.indexOf('\nconst server=http.createServer');
+const start = source.indexOf('
+const server=http.createServer');
 if (start < 0) throw new Error('Could not locate server startup boundary');
 const boot = source.slice(0, start);
 
@@ -21,7 +22,7 @@ function fixture(t, seed) {
     fetch: async () => { throw new Error('fetch must be stubbed for this test'); }
   };
   vm.createContext(sandbox);
-  vm.runInContext(boot + '\n;globalThis.__engine={state,defaults,choosePair,quoteFresh,replacement,decayCheck,riskChecks,engine,refresh,getRefreshLock:()=>refreshInFlight,pnl,load,save,openPosition,closePosition};', sandbox);
+  vm.runInContext(boot + '\\n;globalThis.__engine={state,defaults,choosePair,quoteFresh,replacement,decayCheck,riskChecks,engine,refresh,getRefreshLock:()=>refreshInFlight,pnl,load,save,openPosition,closePosition};', sandbox);
   return { e: sandbox.__engine, sandbox, dir };
 }
 const exp = '2027-01-29';
@@ -140,6 +141,20 @@ test('restart restores position/history but forces auto-trading disabled', (t) =
   assert.equal(e.state.config.enabled, false);
   assert.equal(e.state.position.qty, 3);
   assert.equal(e.state.journal[0].action, 'saved');
-  const saved = JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8'));\n  assert.equal(saved.config.enabled, false);\n  assert.equal(saved.position.qty, 3);
+  const saved = JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8'));
+  assert.equal(saved.config.enabled, false);
+  assert.equal(saved.position.qty, 3);
 });
-\n\ntest('refresh-in-flight lock prevents overlapping feed fetches', async (t) => {\n  const { e, sandbox } = fixture(t);\n  let calls = 0, resolveFetch;\n  sandbox.fetch = () => { calls++; return new Promise(resolve => { resolveFetch = resolve; }); };\n  const first = e.refresh();\n  const second = e.refresh();\n  assert.equal(calls, 1);\n  resolveFetch({ ok: true, json: async () => ({ success: true, result: [ticker('P-BTC-93000-20270129',93000,100,105,'put')] }) });\n  await Promise.all([first, second]);\n  assert.equal(e.getRefreshLock(), false);\n});\n
+
+
+test('refresh-in-flight lock prevents overlapping feed fetches', async (t) => {
+  const { e, sandbox } = fixture(t);
+  let calls = 0, resolveFetch;
+  sandbox.fetch = () => { calls++; return new Promise(resolve => { resolveFetch = resolve; }); };
+  const first = e.refresh();
+  const second = e.refresh();
+  assert.equal(calls, 1);
+  resolveFetch({ ok: true, json: async () => ({ success: true, result: [ticker('P-BTC-93000-20270129',93000,100,105,'put')] }) });
+  await Promise.all([first, second]);
+  assert.equal(e.getRefreshLock(), false);
+});
