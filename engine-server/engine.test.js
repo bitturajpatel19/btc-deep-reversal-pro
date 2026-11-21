@@ -44,7 +44,7 @@ function base(t) {
 test('pair selector chooses closest premium pair, then 7% OTM tie-break', (t) => {
   const e = base(t);
   const pair = e.choosePair(exp);
-  assert.ok(pair);
+  assert.ok(pair, JSON.stringify({spot:e.state.spot,expiry:exp,quotes:e.state.tickers.map(o=>({symbol:o.symbol,expiry:o.expiry_date,type:o.contract_type,strike:o.strike_price,bid:o.quotes.best_bid,ask:o.quotes.best_ask,fresh:e.quoteFresh(o)}))}));
   assert.equal(pair.p.symbol, 'P-BTC-93000-20270129');
   assert.equal(pair.c.symbol, 'C-BTC-107000-20270129');
 });
@@ -76,8 +76,10 @@ test('decay booking requires 20% decay AND opposite leg 7% rise; replacement is 
     { side: 'SELL PE', symbol: 'P-BTC-93000-20270129', entry: 100, entryAt: Date.now() },
     { side: 'SELL CE', symbol: 'C-BTC-107000-20270129', entry: 100, entryAt: Date.now() }
   ] };
-  e.state.tickers[0].quotes.best_ask = 80; // exactly 20% decay
-  e.state.tickers[2].quotes.best_ask = 107; // exactly 7% rise
+  e.state.tickers[0].quotes.best_bid = 75;
+  e.state.tickers[0].quotes.best_ask = 80; // valid spread, exactly 20% decay
+  e.state.tickers[2].quotes.best_bid = 100;
+  e.state.tickers[2].quotes.best_ask = 107; // valid spread, exactly 7% rise
   e.state.tickers[2].quotes.best_bid = 101;
   e.decayCheck();
   assert.equal(e.state.position.legs.length, 2);
@@ -93,7 +95,9 @@ test('decay does not trigger when opposite leg has risen less than 7%', (t) => {
     { side: 'SELL PE', symbol: 'P-BTC-93000-20270129', entry: 100, entryAt: Date.now() },
     { side: 'SELL CE', symbol: 'C-BTC-107000-20270129', entry: 100, entryAt: Date.now() }
   ] };
+  e.state.tickers[0].quotes.best_bid = 75;
   e.state.tickers[0].quotes.best_ask = 80;
+  e.state.tickers[2].quotes.best_bid = 100;
   e.state.tickers[2].quotes.best_ask = 106.99;
   e.decayCheck();
   assert.equal(e.state.journal.some(j => j.action === 'DECAY PROFIT BOOK'), false);
@@ -115,7 +119,9 @@ test('take-profit and stop-loss close positions only with fresh marks', (t) => {
   ] };
   e.state.config.takeProfitPct = 50;
   e.state.config.stopLossMultiple = 1;
+  e.state.tickers[0].quotes.best_bid = 35;
   e.state.tickers[0].quotes.best_ask = 40;
+  e.state.tickers[2].quotes.best_bid = 35;
   e.state.tickers[2].quotes.best_ask = 40;
   e.riskChecks();
   assert.equal(e.state.position, null);
@@ -127,7 +133,9 @@ test('take-profit and stop-loss close positions only with fresh marks', (t) => {
   ] };
   e.state.realized = 0;
   e.state.config.takeProfitPct = 0;
+  e.state.tickers[0].quotes.best_bid = 215;
   e.state.tickers[0].quotes.best_ask = 220;
+  e.state.tickers[2].quotes.best_bid = 215;
   e.state.tickers[2].quotes.best_ask = 220;
   e.riskChecks();
   assert.equal(e.state.position, null);
