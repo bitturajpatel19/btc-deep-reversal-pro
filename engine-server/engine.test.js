@@ -136,9 +136,10 @@ test('take-profit and stop-loss close positions only with fresh marks', (t) => {
 
 test('restart restores position/history but forces auto-trading disabled', (t) => {
   const seeded = { config: { enabled: true, quantity: 3 }, position: { qty: 3, legs: [] }, realized: 12, journal: [{ action: 'saved' }], locked: false };
-  const { e } = fixture(t, seeded);
+  const { e, dir } = fixture(t, seeded);
   assert.equal(e.state.config.enabled, false);
   assert.equal(e.state.position.qty, 3);
   assert.equal(e.state.journal[0].action, 'saved');
-  const saved = JSON.parse(fs.readFileSync(path.join(e.state ? e.defaults && '' : '', 'never'), 'utf8'));
+  const saved = JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8'));\n  assert.equal(saved.config.enabled, false);\n  assert.equal(saved.position.qty, 3);
 });
+\n\ntest('refresh-in-flight lock prevents overlapping feed fetches', async (t) => {\n  const { e, sandbox } = fixture(t);\n  let calls = 0, resolveFetch;\n  sandbox.fetch = () => { calls++; return new Promise(resolve => { resolveFetch = resolve; }); };\n  const first = e.refresh();\n  const second = e.refresh();\n  assert.equal(calls, 1);\n  resolveFetch({ ok: true, json: async () => ({ success: true, result: [ticker('P-BTC-93000-20270129',93000,100,105,'put')] }) });\n  await Promise.all([first, second]);\n  assert.equal(e.getRefreshLock(), false);\n});\n
