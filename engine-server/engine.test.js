@@ -6,8 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8');
-const start = source.indexOf('
-const server=http.createServer');
+const start = source.indexOf('\nconst server=http.createServer');
 if (start < 0) throw new Error('Could not locate server startup boundary');
 const boot = source.slice(0, start);
 
