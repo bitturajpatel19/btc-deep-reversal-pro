@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Isolated server-side PRO paper trading engine",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=20" }
-}
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test engine.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}\n
